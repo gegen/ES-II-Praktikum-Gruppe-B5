@@ -3,12 +3,18 @@ const int ledPin = LED_BUILTIN;
 
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
+
+  while (!Serial) {
+    delay(1);
+  }  
 
   pinMode(buttonPin, INPUT_PULLUP);
   pinMode(ledPin, OUTPUT);
 }
 
 void loop() {
-  digitalWrite(ledPin, digitalRead(buttonPin));
+  bool btnState = digitalRead(buttonPin);
+  digitalWrite(ledPin, btnState);
+  Serial.println(btnState);
 }
