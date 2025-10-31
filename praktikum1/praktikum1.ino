@@ -1,9 +1,14 @@
-void setup() {
-  // put your setup code here, to run once:
+const int buttonPin = 3;
+const int ledPin = LED_BUILTIN;
 
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
+  digitalWrite(ledPin, digitalRead(buttonPin));
 }
