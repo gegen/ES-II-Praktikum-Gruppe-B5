@@ -38,13 +38,15 @@ const int LED_PIN = LED_BUILTIN;
 
 // Taskscheduler
 Scheduler runner;
+void autoReturnToIstwert();
 void sensorenLesen();
 void servoStellen();
 void updateLCD();
 
-Task taskSensorenLesen(1000, TASK_FOREVER, &sensorenLesen);
+Task taskAutoReturn(20000, 1, &autoReturnToIstwert);
+Task taskSensorenLesen(100, TASK_FOREVER, &sensorenLesen);
 Task taskServoStellen(1000, TASK_FOREVER, & servoStellen);
-Task taskUpdateLCD(1000, TASK_FOREVER, &updateLCD);
+Task taskUpdateLCD(100, TASK_FOREVER, &updateLCD);
 
 // Temp
 const int pinTempSensor = A0;
@@ -72,6 +74,7 @@ void setup() {
   meinServo.attach(7);
 
   // Taskscheduler
+  runner.addTask(taskAutoReturn);
   runner.addTask(taskSensorenLesen);
   runner.addTask(taskServoStellen);
   runner.addTask(taskUpdateLCD);
@@ -86,14 +89,26 @@ void setup() {
 }
 
 void loop() {
+  runner.execute();
 }
 
 void handleTasterPress() {
   if (lcdMode == LCD_MODE_ISTWERT) {
+    // Sollwert Modus aktivieren
     lcdMode = LCD_MODE_SollWERT;
+
+    taskAutoReturn.restartDelayed(20000);
   } else {
+    // Temp übernehmen
+    sollTempC = potiSollTemp;
     lcdMode = LCD_MODE_ISTWERT;
+
+    taskAutoReturn.disable();
   }
+}
+
+void autoReturnToIstwert() {
+  lcdMode = LCD_MODE_ISTWERT;
 }
 
 void sensorenLesen() {
@@ -103,7 +118,7 @@ void sensorenLesen() {
   
   // Poti
   int potiValue = analogRead(POTI_PIN);
-  int potiSollTemp = map(potiValue, 0, ADCMax, 0, 30);
+  potiSollTemp = map(potiValue, 0, ADCMax, 0, 30);
   // servoAngle = map(potiValue, 0, ADCMax, 5, 160);
 
   // meinServo.write(servoAngle);
@@ -124,14 +139,22 @@ void sensorenLesen() {
 }
 
 void servoStellen() {
-  //servoAngle = map(potiValue, 0, ADCMax, 5, 160);
+  float diff = currentTempC - sollTempC;
 
-  if (abs(currentTempC - sollTempC) < 1.0) {
-    meinServo.write(80); // 50%
-  } else if (currentTempC - sollTempC < 5) {
-    meinServo.write(160); // 100%
+  if (diff <= -5.0) {
+    // 5K unter Soll 100%
+    meinServo.write(160);
+    servoAngle = 100;
+
+  } else if (diff >= 5.0) {
+    // 5K über Soll 0%
+    meinServo.write(10);
+    servoAngle = 0;
+
   } else {
-    meinServo.write(5); // 0%
+    // Solltemperatur erreicht 50%
+    meinServo.write(80);
+    servoAngle = 50;
   }
 }
 
@@ -145,16 +168,13 @@ void updateLCD() {
     lcd.print(" C");
 
     lcd.setCursor(0, 1);
-    lcd.print("S: ");
+    lcd.print("Servo: ");
     lcd.print(servoAngle);
-    lcd.write(223); // grad code
+    lcd.print(" %");
   } else {
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("T: ");
     lcd.print("Sollwert:");
-    lcd.write(223); // grad code
-    lcd.print("C");
 
     lcd.setCursor(0, 1);
     lcd.print(potiSollTemp, 1);
