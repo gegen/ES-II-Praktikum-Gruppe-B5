@@ -17,8 +17,8 @@ int servoAngle;
 
 // LCD
 rgb_lcd lcd;
-const int LCD_MODE_ISTWERT = 0
-const int LCD_MODE_SollWERT = 1
+const int LCD_MODE_ISTWERT = 0;
+const int LCD_MODE_SollWERT = 1;
 int lcdMode = LCD_MODE_ISTWERT;
 
 const int colorR = 255;
@@ -27,6 +27,7 @@ const int colorB = 0;
 
 // Poti
 const int POTI_PIN = A1;
+int potiSollTemp;
 
 // Taster
 const int TASTER_PIN = 3;
@@ -37,9 +38,11 @@ const int LED_PIN = LED_BUILTIN;
 
 // Taskscheduler
 Scheduler runner;
+void sensorenLesen();
 void servoStellen();
 void updateLCD();
 
+Task taskSensorenLesen(1000, TASK_FOREVER, &sensorenLesen);
 Task taskServoStellen(1000, TASK_FOREVER, & servoStellen);
 Task taskUpdateLCD(1000, TASK_FOREVER, &updateLCD);
 
@@ -48,6 +51,7 @@ const int pinTempSensor = A0;
 const unsigned int B = 4275;  // b wert anpassen für ntc
 const float T0_KELVIN = 298.15; 
 float currentTempC = 0.0;
+int sollTempC = 0;
 
 
 void setup() {
@@ -68,8 +72,10 @@ void setup() {
   meinServo.attach(7);
 
   // Taskscheduler
+  runner.addTask(taskSensorenLesen);
   runner.addTask(taskServoStellen);
   runner.addTask(taskUpdateLCD);
+  taskSensorenLesen.enable();
   taskServoStellen.enable();
   taskUpdateLCD.enable();
 
@@ -78,41 +84,33 @@ void setup() {
   lcd.begin(16, 2, LCD_5x8DOTS, WireMaster);
   lcd.setRGB(colorR, colorG, colorB);
 }
+
 void loop() {
-  unsigned long currentMillis = millis();
-  unsigned long interval = turboMode ? TURBO_INTERVAL : NORMAL_INTERVAL;
-    
-  if (loopStartMillis == 0) {
-      loopStartMillis = currentMillis;
-  }
+}
 
-
-  // 3 Sekunden Durchlauf
-  if (currentMillis - previousLedMillis >= interval) {
-    previousLedMillis = currentMillis;
-    logic();
-  }
-
-  if (turboMode && (millis() - turboStartMillis >= TURBO_DURATION)) {
-      turboMode = false;
-      DEBUG_PRINTLN("Turbo-Modus beendet");
+void handleTasterPress() {
+  if (lcdMode == LCD_MODE_ISTWERT) {
+    lcdMode = LCD_MODE_SollWERT;
+  } else {
+    lcdMode = LCD_MODE_ISTWERT;
   }
 }
 
-void logic() {
+void sensorenLesen() {
   // LED Updaten
   int ledState = digitalRead(LED_PIN);
   digitalWrite(LED_PIN, !ledState);
   
-  // Servo
+  // Poti
   int potiValue = analogRead(POTI_PIN);
-  servoAngle = map(potiValue, 0, ADCMax, 5, 160);
+  int potiSollTemp = map(potiValue, 0, ADCMax, 0, 30);
+  // servoAngle = map(potiValue, 0, ADCMax, 5, 160);
 
-  meinServo.write(servoAngle);
+  // meinServo.write(servoAngle);
 
-  DEBUG_PRINT("Servo Winkel: ");
-  DEBUG_PRINT(servoAngle);
-  DEBUG_PRINTLN("°");
+  DEBUG_PRINT("Poti Soll Temp: ");
+  DEBUG_PRINT(potiSollTemp);
+  DEBUG_PRINTLN("° C");
 
   // Temp
   unsigned int tempRawValue = analogRead(pinTempSensor);
@@ -123,8 +121,18 @@ void logic() {
   DEBUG_PRINT("Aktuelle Temperatur: ");
   DEBUG_PRINT(currentTempC);
   DEBUG_PRINTLN(" °C");
+}
 
-  updateLCD(currentTempC, servoAngle);
+void servoStellen() {
+  //servoAngle = map(potiValue, 0, ADCMax, 5, 160);
+
+  if (abs(currentTempC - sollTempC) < 1.0) {
+    meinServo.write(80); // 50%
+  } else if (currentTempC - sollTempC < 5) {
+    meinServo.write(160); // 100%
+  } else {
+    meinServo.write(5); // 0%
+  }
 }
 
 void updateLCD() {
@@ -134,7 +142,7 @@ void updateLCD() {
     lcd.print("T: ");
     lcd.print(currentTempC, 1);
     lcd.write(223); // grad code
-    lcd.print("C");
+    lcd.print(" C");
 
     lcd.setCursor(0, 1);
     lcd.print("S: ");
@@ -149,8 +157,9 @@ void updateLCD() {
     lcd.print("C");
 
     lcd.setCursor(0, 1);
-    lcd.print("S: ");
-    lcd.print(servoAngle);
+    lcd.print();
+    lcd.print(potiSollTemp);
     lcd.write(223); // grad code
+    lcd.write(" C"); // grad code
   }
 }
