@@ -152,13 +152,12 @@ void updateLCD() {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("T: ");
-    lcd.print("Sollwert:", 1);
+    lcd.print("Sollwert:");
     lcd.write(223); // grad code
     lcd.print("C");
 
     lcd.setCursor(0, 1);
-    lcd.print();
-    lcd.print(potiSollTemp);
+    lcd.print(potiSollTemp, 1);
     lcd.write(223); // grad code
     lcd.write(" C"); // grad code
   }
